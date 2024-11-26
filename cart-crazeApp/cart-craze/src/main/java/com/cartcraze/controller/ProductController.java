@@ -1,45 +1,71 @@
 package com.cartcraze.controller;
 
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.web.bind.annotation.*;
 
-import com.cartcraze.model.Products;
-import com.cartcraze.service.ProductService;
+import com.cartcraze.model.Product;
+import com.cartcraze.repository.ProductRepository;
 
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 
 @RestController
-@RequestMapping("/products")
+@RequestMapping("/api/products")
 public class ProductController {
 
     @Autowired
-    private ProductService productService;
+    private ProductRepository productRepository;
 
     @GetMapping
-    public List<Products> getAllProducts() {
-        return productService.getAllProducts();
+    public Map<String, Object> getAllProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                sortDir.equalsIgnoreCase("asc")
+                        ? Sort.by(sortBy).ascending()
+                        : Sort.by(sortBy).descending());
+
+        Page<Product> products = productRepository.findAll(pageable);
+
+        Map<String, Object> response = new HashMap<>();
+        Map<String, Object> meta = new HashMap<>();
+
+        meta.put("currentPage", products.getNumber());
+        meta.put("totalPages", products.getTotalPages());
+        meta.put("totalElements", products.getTotalElements());
+        meta.put("pageSize", products.getSize());
+
+        response.put("data", products.getContent());
+        response.put("meta", meta);
+
+        return response;
     }
 
     @GetMapping("/{id}")
-    public Products getProductById(@PathVariable Long id) {
-        return productService.getProductsById(id);
+    public Product getProductById(@PathVariable Long id) {
+        return productRepository.findById(id).orElseThrow(() -> new RuntimeException("Product not Found"));
     }
 
     @PostMapping
-    public Products createProduct(@RequestBody Products product) {
-        return productService.saveProducts(product);
+    public Product createProduct(@RequestBody Product product) {
+        System.out.println("Received Product: " + product);
+        return productRepository.save(product);
     }
 
     @DeleteMapping("/{id}")
     public void deleteProduct(@PathVariable Long id) {
-        productService.deleteProdut(id);
+        productRepository.deleteById(id);
     }
 
 }
